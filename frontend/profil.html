@@ -1,0 +1,6 @@
+<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Profil</title><link rel="stylesheet" href="/css/temel.css"></head><body>
+<div id="ust-bar"></div><main class="kart" style="max-width:500px;"><h1>Profil Bilgileri</h1><div id="bilgi"></div></main>
+<script src="/js/ortak.js"></script><script>
+oturumKontrol();ustMenuCiz("profil.html");
+bakiyeYenile().then(k=>{bilgi.innerHTML=`<p><strong>ID:</strong> ${k.id}</p><p><strong>Ad Soyad:</strong> ${k.ad} ${k.soyad}</p><p><strong>E-posta:</strong> ${k.eposta}</p><p><strong>Rol:</strong> ${k.rol}</p><p><strong>Ogrenci No:</strong> ${k.ogrenci_no||"Yok"}</p><p><strong>Bakiye:</strong> ${Number(k.bakiye).toFixed(2)} TL</p>`})
+</script></body></html>

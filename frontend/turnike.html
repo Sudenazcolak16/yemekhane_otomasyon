@@ -1,0 +1,9 @@
+<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Turnike</title><link rel="stylesheet" href="/css/temel.css"></head><body>
+<div id="ust-bar"></div><main class="kart" style="max-width:500px;"><h1>Turnike Simulasyonu</h1><div id="mesaj" class="gizli"></div>
+<form id="tf"><div class="form-grup"><label>Kullanici ID</label><input id="kid" type="number" required></div>
+<div class="form-grup"><label>Yemekhane</label><select id="yid"><option value="1">Merkez Yemekhane</option><option value="2">Muhendislik Yemekhanesi</option></select></div>
+<div class="form-grup"><label>Test Zamani (Opsiyonel)</label><input id="zaman" type="text" placeholder="2026-11-18 12:15:00"></div>
+<button type="submit" class="dugme">Karti Okut</button></form></main><script src="/js/ortak.js"></script><script>
+const k=oturumKontrol();ustMenuCiz("turnike.html");kid.value=k.id;
+tf.onsubmit=async e=>{e.preventDefault();try{const r=await apiIstek("/api/turnike",{method:"POST",body:JSON.stringify({kullanici_id:Number(kid.value),yemekhane_id:Number(yid.value),zaman:zaman.value.trim()||null})});mesajGoster("mesaj",`${r.mesaj} (Rez #${r.sonuc.rezervasyon_id})`)}catch(err){mesajGoster("mesaj",err.message,true)}}
+</script></body></html>

@@ -1,0 +1,10 @@
+<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Bakiye</title><link rel="stylesheet" href="/css/temel.css"></head><body>
+<div id="ust-bar"></div><main class="kart"><h1>Bakiye Yukleme</h1><div id="mesaj" class="gizli"></div>
+<p>Mevcut Bakiye: <strong id="bg">0.00</strong> TL</p>
+<form id="bf" style="display:flex;gap:0.75rem;max-width:360px;margin:1rem 0;"><input id="tutar" type="number" min="100" max="1000" value="150" required><button type="submit" class="dugme">Yukle</button></form>
+<div class="tablo-kaydir"><table><thead><tr><th>Tarih</th><th>Tur</th><th>Tutar</th><th>Aciklama</th></tr></thead><tbody id="har"></tbody></table></div></main>
+<script src="/js/ortak.js"></script><script>
+oturumKontrol();ustMenuCiz("bakiye.html");
+async function yukle(){try{const v=await apiIstek("/api/bakiye");bg.textContent=v.bakiye.toFixed(2);har.innerHTML=v.hareketler.map(h=>`<tr><td>${h.olusturma}</td><td>${h.tur}</td><td>${h.tutar.toFixed(2)} TL</td><td>${h.aciklama||"-"}</td></tr>`).join("")}catch(e){mesajGoster("mesaj",e.message,true)}}
+bf.onsubmit=async e=>{e.preventDefault();try{const r=await apiIstek("/api/bakiye/yukle",{method:"POST",body:JSON.stringify({tutar:Number(tutar.value)})});mesajGoster("mesaj",r.mesaj);await bakiyeYenile();yukle()}catch(err){mesajGoster("mesaj",err.message,true)}};yukle()
+</script></body></html>

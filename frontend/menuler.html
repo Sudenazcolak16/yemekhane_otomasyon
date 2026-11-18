@@ -1,0 +1,12 @@
+<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Menuler</title><link rel="stylesheet" href="/css/temel.css"></head><body>
+<div id="ust-bar"></div><main class="kart"><h1>Gunluk Menuler</h1><div id="mesaj" class="gizli"></div>
+<div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin:1rem 0;">
+  <div><label>Tarih</label><input id="tarih" type="date"></div>
+  <div><label>Yemekhane</label><select id="yemekhane"><option value="">Tumu</option><option value="1">Merkez Yemekhane</option><option value="2">Muhendislik Yemekhanesi</option></select></div>
+  <div style="align-self:end;"><button class="dugme" onclick="menuleriYukle()">Filtrele</button></div>
+</div><div id="liste" class="kart-izgara"></div></main><script src="/js/ortak.js"></script><script>
+const k=oturumKontrol();ustMenuCiz("menuler.html");
+async function menuleriYukle(){const q=new URLSearchParams();if(tarih.value)q.set("tarih",tarih.value);if(yemekhane.value)q.set("yemekhane_id",yemekhane.value);try{const m=await apiIstek("/api/menuler?"+q);liste.innerHTML=m.length?m.map(x=>{const f=k.rol==="ogrenci"?x.ogrenci_fiyati:x.personel_fiyati;return `<article class="kart"><h3>${x.tarih} - ${x.ogun_ad}</h3><p><strong>${x.yemekhane_ad}</strong> (${x.dolu_sayisi}/${x.kapasite})</p><p>Servis: ${x.servis_baslangic.slice(0,5)}-${x.servis_bitis.slice(0,5)} | Son: ${x.son_saat.slice(0,5)}</p><ul>${x.yemekler.map(y=>`<li>${y.ad} (${y.kalori} kcal)</li>`).join("")}</ul><p><strong>${f.toFixed(2)} TL</strong></p><button class="dugme" onclick="rezYap(${x.id})">Rezervasyon Yap</button></article>`}).join(""):"<p>Menu bulunamadi.</p>"}catch(e){mesajGoster("mesaj",e.message,true)}}
+async function rezYap(id){try{const r=await apiIstek("/api/rezervasyonlar",{method:"POST",body:JSON.stringify({menu_id:id})});mesajGoster("mesaj",r.mesaj);await bakiyeYenile();menuleriYukle()}catch(e){mesajGoster("mesaj",e.message,true)}}
+menuleriYukle()
+</script></body></html>

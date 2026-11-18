@@ -1,0 +1,18 @@
+<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Yonetici</title><link rel="stylesheet" href="/css/temel.css"></head><body>
+<div id="ust-bar"></div><main class="kart"><h1>Yonetici Paneli</h1><div id="mesaj" class="gizli"></div>
+<form id="mf" class="kart" style="margin-bottom:1.5rem;"><h3>Yeni Menu Ekle</h3>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;">
+  <div><label>Yemekhane</label><select id="yid"></select></div>
+  <div><label>Tarih</label><input id="tarih" type="date" required></div>
+  <div><label>Ogun</label><select id="oid"></select></div>
+  <div><label>Ogrenci TL</label><input id="ofiyat" type="number" value="25" required></div>
+  <div><label>Personel TL</label><input id="pfiyat" type="number" value="60" required></div>
+</div>
+<div class="form-grup" style="margin-top:0.75rem;"><label>Yemekler (Ctrl ile coklu secim)</label><select id="ym" multiple size="5" required></select></div>
+<button type="submit" class="dugme">Kaydet</button></form>
+<h3>Raporlar</h3><div class="tablo-kaydir"><table><thead><tr><th>Tarih</th><th>Yemekhane</th><th>Ogun</th><th>Rez</th><th>Kullanilan</th><th>Puan</th></tr></thead><tbody id="rt"></tbody></table></div></main>
+<script src="/js/ortak.js"></script><script>
+oturumKontrol(true);ustMenuCiz("yonetici.html");
+async function yukle(){try{const v=await apiIstek("/api/admin/ozet");yid.innerHTML=v.yemekhaneler.map(y=>`<option value="${y.id}">${y.ad}</option>`).join("");oid.innerHTML=v.ogunler.map(o=>`<option value="${o.id}">${o.ad}</option>`).join("");ym.innerHTML=v.yemekler.map(y=>`<option value="${y.id}">[${y.kategori}] ${y.ad}</option>`).join("");rt.innerHTML=v.rapor.map(r=>`<tr><td>${r.tarih}</td><td>${r.yemekhane}</td><td>${r.ogun}</td><td>${r.toplam_rez}</td><td>${r.kullanilan}</td><td>${r.ort_puan??"-"}</td></tr>`).join("")}catch(e){mesajGoster("mesaj",e.message,true)}}
+mf.onsubmit=async e=>{e.preventDefault();const sec=Array.from(ym.selectedOptions).map(o=>Number(o.value));try{const r=await apiIstek("/api/admin/menuler",{method:"POST",body:JSON.stringify({yemekhane_id:Number(yid.value),tarih:tarih.value,ogun_id:Number(oid.value),ogrenci_fiyati:Number(ofiyat.value),personel_fiyati:Number(pfiyat.value),yemek_idler:sec})});mesajGoster("mesaj",r.mesaj);yukle()}catch(err){mesajGoster("mesaj",err.message,true)}};yukle()
+</script></body></html>
