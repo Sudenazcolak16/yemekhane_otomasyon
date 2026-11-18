@@ -221,3 +221,24 @@ container'ında `TZ=Europe/Istanbul` tanımlıdır. Son saat karşılaştırmas�
 
 **Replikada yeni veri hemen görünmüyor** — Replikasyon eşzamansızdır. Bunun uygulamanızdaki
 etkisini ve çözümünü raporda açıklamanız isteniyor.
+
+
+## Aşama 2: Çalışan Uygulama ve Ekran Görüntüleri
+
+### Kurulum ve Çalıştırma
+```bash
+docker compose up -d --build
+```
+
+Test Hesapları
+Yönetici: leyla.arslan@kampus.edu.tr / Şifre: Yemek2026!
+
+Personel: murat.kaya@kampus.edu.tr / Şifre: Yemek2026!
+
+Uygulama Ekranları
+![Giriş Ekranı](ekran-goruntuleri/1-giris.png)
+![Menüler Ekranı](ekran-goruntuleri/2-menuler.png)
+![Rezervasyonlarım Ekranı](ekran-goruntuleri/3-rezervasyonlar.png)
+![Bakiye Ekranı](ekran-goruntuleri/4-bakiye.png)
+![Turnike Ekranı](ekran-goruntuleri/5-turnike.png)
+![Yönetici Paneli](ekran-goruntuleri/6-yonetici.png)
