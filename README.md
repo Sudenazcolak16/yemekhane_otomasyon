@@ -234,11 +234,22 @@ Test Hesapları
 Yönetici: leyla.arslan@kampus.edu.tr / Şifre: Yemek2026!
 
 Personel: murat.kaya@kampus.edu.tr / Şifre: Yemek2026!
+### Uygulama Ekranları
 
-Uygulama Ekranları
-![Giriş Ekranı](ekran-goruntuleri/1-giris.png)
-![Menüler Ekranı](ekran-goruntuleri/2-menuler.png)
-![Rezervasyonlarım Ekranı](ekran-goruntuleri/3-rezervasyonlar.png)
-![Bakiye Ekranı](ekran-goruntuleri/4-bakiye.png)
-![Turnike Ekranı](ekran-goruntuleri/5-turnike.png)
-![Yönetici Paneli](ekran-goruntuleri/6-yonetici.png)
+#### 1. Giriş Ekranı
+![Giriş Ekranı](ekran%20görüntüleri/girişekranı.png)
+
+#### 2. Günlük Menüler ve Rezervasyon
+![Menüler Ekranı](ekran%20görüntüleri/menuler.png)
+
+#### 3. Rezervasyonlarım ve Değerlendirme
+![Rezervasyonlarım Ekranı](ekran%20görüntüleri/rezervasyon.png)
+
+#### 4. Bakiye Yükleme ve Hareketler
+![Bakiye Ekranı](ekran%20görüntüleri/bakiye.png)
+
+#### 5. Turnike Simülasyonu
+![Turnike Ekranı](ekran%20görüntüleri/turnike.png)
+
+#### 6. Yönetici Paneli ve Raporlar
+![Yönetici Paneli](ekran%20görüntüleri/yönetici.png)
