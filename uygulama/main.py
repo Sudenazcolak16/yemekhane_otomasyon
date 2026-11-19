@@ -63,10 +63,8 @@ def get_current_user(
         oturum_verisi = rdb.get(oturum_anahtari)
         if not oturum_verisi:
             raise HTTPException(status_code=401, detail="Oturum süresi dolmuş veya geçersiz.")
-        # Her istekte oturum suresini 30 dakikaya yenile
         rdb.expire(oturum_anahtari, OTURUM_SURESI)
         kullanici = json.loads(oturum_verisi)
-        # Guncel bakiye kontrolu (replikasyon gecikmesi olmamasi icin gerektiginde DB'den tazele)
         conn = get_conn(write=True)
         try:
             with conn.cursor() as cur:
@@ -78,7 +76,6 @@ def get_current_user(
             conn.close()
         return kullanici
 
-    # Geriye donuk uyumluluk (eski istemci istekleri icin)
     if x_user_id:
         conn = get_conn(write=False)
         try:
@@ -102,6 +99,11 @@ class LoginReq(BaseModel):
 
 class RezReq(BaseModel):
     menu_id: int
+    porsiyon: Optional[str] = "tam"
+
+
+class AlerjenGuncelleReq(BaseModel):
+    alerjen_idler: List[int]
 
 
 class BakiyeReq(BaseModel):
@@ -181,13 +183,46 @@ def profil(authorization: Optional[str] = Header(None), x_user_id: Optional[str]
     return get_current_user(authorization, x_user_id)
 
 
+@app.get("/api/alerjenler")
+def alerjenleri_getir(authorization: Optional[str] = Header(None), x_user_id: Optional[str] = Header(None)):
+    user = get_current_user(authorization, x_user_id)
+    conn = get_conn(write=False)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, ad FROM alerjenler ORDER BY id ASC")
+            tum_alerjenler = cur.fetchall()
+            cur.execute("SELECT alerjen_id FROM kullanici_alerjenleri WHERE kullanici_id = %s", (user["id"],))
+            secili_idler = [row["alerjen_id"] for row in cur.fetchall()]
+            return {"alerjenler": tum_alerjenler, "secili_idler": secili_idler}
+    finally:
+        conn.close()
+
+
+@app.put("/api/profil/alerjenler")
+def alerjenleri_guncelle(req: AlerjenGuncelleReq, authorization: Optional[str] = Header(None), x_user_id: Optional[str] = Header(None)):
+    user = get_current_user(authorization, x_user_id)
+    conn = get_conn(write=True)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM kullanici_alerjenleri WHERE kullanici_id = %s", (user["id"],))
+            for aid in set(req.alerjen_idler):
+                cur.execute(
+                    "INSERT INTO kullanici_alerjenleri (kullanici_id, alerjen_id) VALUES (%s, %s)",
+                    (user["id"], aid),
+                )
+            return {"mesaj": "Alerjen tercihleriniz güncellendi.", "secili_idler": list(set(req.alerjen_idler))}
+    except pymysql.MySQLError as e:
+        raise HTTPException(status_code=400, detail=e.args[1] if len(e.args) > 1 else str(e))
+    finally:
+        conn.close()
+
+
 def _tek_menu_getir_veya_onbellekle(cur, yemekhane_id: int, tarih_str: str, ogun_id: int):
     cache_key = f"menu:{yemekhane_id}:{tarih_str}:{ogun_id}"
     cached = rdb.get(cache_key)
     if cached:
         logger.info(f"[CACHE HIT] Redis'ten okundu -> {cache_key}")
         menu_obj = json.loads(cached)
-        # Canli doluluk sayisini replikadan guncelle
         cur.execute(
             "SELECT COUNT(*) AS cnt FROM rezervasyonlar WHERE menu_id = %s AND durum IN ('aktif','kullanildi')",
             (menu_obj["id"],),
@@ -221,7 +256,13 @@ def _tek_menu_getir_veya_onbellekle(cur, yemekhane_id: int, tarih_str: str, ogun
     row["personel_fiyati"] = float(row["personel_fiyati"])
     cur.execute(
         """
-        SELECT ym.id, ym.ad, ym.kalori, ym.vejetaryen, k.ad AS kategori
+        SELECT ym.id, ym.ad, ym.kalori, ym.vejetaryen, k.ad AS kategori,
+               (SELECT GROUP_CONCAT(a.id ORDER BY a.id)
+                  FROM yemek_alerjenleri ya JOIN alerjenler a ON a.id = ya.alerjen_id
+                 WHERE ya.yemek_id = ym.id) AS alerjen_idler_str,
+               (SELECT GROUP_CONCAT(a.ad ORDER BY a.ad SEPARATOR ', ')
+                  FROM yemek_alerjenleri ya JOIN alerjenler a ON a.id = ya.alerjen_id
+                 WHERE ya.yemek_id = ym.id) AS alerjenler
         FROM menu_yemekleri my
         JOIN yemekler ym ON ym.id = my.yemek_id
         JOIN yemek_kategorileri k ON k.id = ym.kategori_id
@@ -230,7 +271,12 @@ def _tek_menu_getir_veya_onbellekle(cur, yemekhane_id: int, tarih_str: str, ogun
         """,
         (row["id"],),
     )
-    row["yemekler"] = cur.fetchall()
+    yemek_listesi = cur.fetchall()
+    for ym in yemek_listesi:
+        ids_str = ym.pop("alerjen_idler_str", None)
+        ym["alerjen_idler"] = [int(x) for x in ids_str.split(",")] if ids_str else []
+        ym["alerjenler"] = ym["alerjenler"] or ""
+    row["yemekler"] = yemek_listesi
 
     ttl = gun_sonuna_kalan_saniye()
     rdb.setex(cache_key, ttl, json.dumps(row, ensure_ascii=False))
@@ -247,7 +293,6 @@ def menuler(
     conn = get_conn(write=False)
     try:
         with conn.cursor() as cur:
-            # Belirli bir yemekhane + tarih + ogun sorgulandiginda dogrudan anahtardan getir
             if yemekhane_id and tarih and ogun_id:
                 tek = _tek_menu_getir_veya_onbellekle(cur, yemekhane_id, tarih, ogun_id)
                 return [tek] if tek else []
@@ -293,7 +338,7 @@ def rezervasyonlar(authorization: Optional[str] = Header(None), x_user_id: Optio
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT r.id, r.menu_id, r.durum, r.ucret, r.olusturma, r.kullanma_zamani, r.iptal_zamani,
+                SELECT r.id, r.menu_id, r.durum, r.porsiyon, r.ucret, r.olusturma, r.kullanma_zamani, r.iptal_zamani,
                        m.tarih, y.ad AS yemekhane_ad, o.ad AS ogun_ad,
                        (SELECT puan FROM degerlendirmeler d WHERE d.kullanici_id = r.kullanici_id AND d.menu_id = r.menu_id) AS puan
                 FROM rezervasyonlar r
@@ -321,9 +366,10 @@ def rezervasyon_yap(req: RezReq, authorization: Optional[str] = Header(None), x_
     conn = get_conn(write=True)
     try:
         with conn.cursor() as cur:
-            cur.callproc("sp_rezervasyon_yap", (user["id"], req.menu_id))
+            porsiyon_val = (req.porsiyon or "tam").strip().lower()
+            cur.callproc("sp_rezervasyon_yap", (user["id"], req.menu_id, porsiyon_val))
             res = cur.fetchone()
-            return {"mesaj": "Rezervasyon oluşturuldu.", "sonuc": res}
+            return {"mesaj": f"Rezervasyon oluşturuldu ({'Yarım Porsiyon' if porsiyon_val == 'yarim' else 'Tam Porsiyon'}).", "sonuc": res}
     except pymysql.MySQLError as e:
         raise HTTPException(status_code=400, detail=e.args[1] if len(e.args) > 1 else str(e))
     finally:
@@ -472,7 +518,6 @@ def admin_menu_ekle_veya_guncelle(req: MenuEkleReq, authorization: Optional[str]
     conn = get_conn(write=True)
     try:
         with conn.cursor() as cur:
-            # Ayni yemekhane + tarih + ogun icin menu varsa guncelle, yoksa ekle
             cur.execute(
                 "SELECT id FROM menuler WHERE yemekhane_id=%s AND tarih=%s AND ogun_id=%s",
                 (req.yemekhane_id, req.tarih, req.ogun_id),
@@ -500,7 +545,6 @@ def admin_menu_ekle_veya_guncelle(req: MenuEkleReq, authorization: Optional[str]
             for yid in req.yemek_idler:
                 cur.execute("INSERT INTO menu_yemekleri (menu_id, yemek_id) VALUES (%s, %s)", (menu_id, yid))
 
-            # Redis onbellegini gecersiz kil
             cache_key = f"menu:{req.yemekhane_id}:{req.tarih}:{req.ogun_id}"
             silinen = rdb.delete(cache_key)
             logger.info(f"[CACHE INVALIDATE] {cache_key} silindi (silinen={silinen})")
