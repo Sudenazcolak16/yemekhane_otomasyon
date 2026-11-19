@@ -1,6 +1,51 @@
 <!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Profil</title><link rel="stylesheet" href="/css/temel.css"></head><body>
-<div id="ust-bar"></div><main class="kart" style="max-width:500px;"><h1>Profil Bilgileri</h1><div id="bilgi"></div></main>
+<div id="ust-bar"></div><main class="kart" style="max-width:560px;">
+  <h1>Profil Bilgileri</h1>
+  <div id="mesaj" class="gizli"></div>
+  <div id="bilgi"></div>
+  <hr style="margin:1.25rem 0;">
+  <h2>Alerjen Tercihlerim</h2>
+  <p style="font-size:0.9rem;color:#555;margin-bottom:0.75rem;">Alerjiniz olan bileşenleri işaretleyin. Menü ekranında bu alerjenleri içeren yemekler uyarıyla gösterilecektir.</p>
+  <form id="alerjen-form">
+    <div id="alerjen-listesi" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:0.5rem;margin-bottom:1rem;"></div>
+    <button type="submit" class="dugme">Alerjenleri Kaydet</button>
+  </form>
+</main>
 <script src="/js/ortak.js"></script><script>
 oturumKontrol();ustMenuCiz("profil.html");
-bakiyeYenile().then(k=>{bilgi.innerHTML=`<p><strong>ID:</strong> ${k.id}</p><p><strong>Ad Soyad:</strong> ${k.ad} ${k.soyad}</p><p><strong>E-posta:</strong> ${k.eposta}</p><p><strong>Rol:</strong> ${k.rol}</p><p><strong>Ogrenci No:</strong> ${k.ogrenci_no||"Yok"}</p><p><strong>Bakiye:</strong> ${Number(k.bakiye).toFixed(2)} TL</p>`})
+bakiyeYenile().then(k=>{
+  bilgi.innerHTML=`<p><strong>ID:</strong> ${k.id}</p><p><strong>Ad Soyad:</strong> ${k.ad} ${k.soyad}</p><p><strong>E-posta:</strong> ${k.eposta}</p><p><strong>Rol:</strong> ${k.rol}</p><p><strong>Ogrenci No:</strong> ${k.ogrenci_no||"Yok"}</p><p><strong>Bakiye:</strong> ${Number(k.bakiye).toFixed(2)} TL</p>`;
+});
+
+async function alerjenleriYukle(){
+  try{
+    const veri = await apiIstek("/api/alerjenler");
+    const seciliSet = new Set(veri.secili_idler || []);
+    alerjen_listesi = document.getElementById("alerjen-listesi");
+    alerjen_listesi.innerHTML = veri.alerjenler.map(a => `
+      <label style="display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0.6rem;border:1px solid #ddd;border-radius:6px;cursor:pointer;">
+        <input type="checkbox" name="alerjen" value="${a.id}" ${seciliSet.has(a.id) ? "checked" : ""}>
+        <span>${a.ad}</span>
+      </label>
+    `).join("");
+  }catch(e){
+    mesajGoster("mesaj", e.message, true);
+  }
+}
+
+document.getElementById("alerjen-form").onsubmit = async e => {
+  e.preventDefault();
+  const secilenler = Array.from(document.querySelectorAll('input[name="alerjen"]:checked')).map(el => Number(el.value));
+  try{
+    const res = await apiIstek("/api/profil/alerjenler", {
+      method: "PUT",
+      body: JSON.stringify({ alerjen_idler: secilenler })
+    });
+    mesajGoster("mesaj", res.mesaj);
+  }catch(err){
+    mesajGoster("mesaj", err.message, true);
+  }
+};
+
+alerjenleriYukle();
 </script></body></html>

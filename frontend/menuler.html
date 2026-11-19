@@ -6,7 +6,83 @@
   <div style="align-self:end;"><button class="dugme" onclick="menuleriYukle()">Filtrele</button></div>
 </div><div id="liste" class="kart-izgara"></div></main><script src="/js/ortak.js"></script><script>
 const k=oturumKontrol();ustMenuCiz("menuler.html");
-async function menuleriYukle(){const q=new URLSearchParams();if(tarih.value)q.set("tarih",tarih.value);if(yemekhane.value)q.set("yemekhane_id",yemekhane.value);try{const m=await apiIstek("/api/menuler?"+q);liste.innerHTML=m.length?m.map(x=>{const f=k.rol==="ogrenci"?x.ogrenci_fiyati:x.personel_fiyati;return `<article class="kart"><h3>${x.tarih} - ${x.ogun_ad}</h3><p><strong>${x.yemekhane_ad}</strong> (${x.dolu_sayisi}/${x.kapasite})</p><p>Servis: ${x.servis_baslangic.slice(0,5)}-${x.servis_bitis.slice(0,5)} | Son: ${x.son_saat.slice(0,5)}</p><ul>${x.yemekler.map(y=>`<li>${y.ad} (${y.kalori} kcal)</li>`).join("")}</ul><p><strong>${f.toFixed(2)} TL</strong></p><button class="dugme" onclick="rezYap(${x.id})">Rezervasyon Yap</button></article>`}).join(""):"<p>Menu bulunamadi.</p>"}catch(e){mesajGoster("mesaj",e.message,true)}}
-async function rezYap(id){try{const r=await apiIstek("/api/rezervasyonlar",{method:"POST",body:JSON.stringify({menu_id:id})});mesajGoster("mesaj",r.mesaj);await bakiyeYenile();menuleriYukle()}catch(e){mesajGoster("mesaj",e.message,true)}}
-menuleriYukle()
+
+function fiyatGuncelle(menuId, tamFiyat){
+  const secim = document.getElementById(`porsiyon-${menuId}`);
+  const fiyatEl = document.getElementById(`fiyat-${menuId}`);
+  if(!secim || !fiyatEl) return;
+  const guncel = secim.value === "yarim" ? (tamFiyat * 0.60) : tamFiyat;
+  fiyatEl.textContent = guncel.toFixed(2) + " TL";
+}
+
+async function menuleriYukle(){
+  const q=new URLSearchParams();
+  if(tarih.value)q.set("tarih",tarih.value);
+  if(yemekhane.value)q.set("yemekhane_id",yemekhane.value);
+  try{
+    const [m, alerjenVeri] = await Promise.all([
+      apiIstek("/api/menuler?"+q),
+      apiIstek("/api/alerjenler").catch(() => ({ alerjenler: [], secili_idler: [] }))
+    ]);
+    const kullaniciAlerjenSet = new Set(alerjenVeri.secili_idler || []);
+    const alerjenAdMap = {};
+    (alerjenVeri.alerjenler || []).forEach(a => { alerjenAdMap[a.id] = a.ad; });
+
+    liste.innerHTML=m.length?m.map(x=>{
+      const f=k.rol==="ogrenci"?x.ogrenci_fiyati:x.personel_fiyati;
+      const yarimFiyat = (f * 0.60).toFixed(2);
+      const yarimMusait = Number(x.ogun_id) !== 1; // Kahvaltida yarim porsiyon yok
+
+      const yemekHtml = x.yemekler.map(y => {
+        const eslesenAlerjenler = (y.alerjen_idler || [])
+          .filter(aid => kullaniciAlerjenSet.has(aid))
+          .map(aid => alerjenAdMap[aid] || "Alerjen");
+        const uyariRozeti = eslesenAlerjenler.length
+          ? `<div style="margin-top:0.2rem;padding:0.2rem 0.45rem;background:#fdecea;color:#b71c1c;border:1px solid #f5c6cb;border-radius:4px;font-size:0.82rem;font-weight:600;">⚠️ Alerjen Uyarısı: ${eslesenAlerjenler.join(", ")}</div>`
+          : "";
+        const alerjenBilgi = y.alerjenler ? `<span style="font-size:0.8rem;color:#666;"> [${y.alerjenler}]</span>` : "";
+        return `<li style="margin-bottom:0.35rem;">${y.ad} (${y.kalori} kcal)${alerjenBilgi}${uyariRozeti}</li>`;
+      }).join("");
+
+      const porsiyonSecimHtml = yarimMusait
+        ? `<div style="margin:0.6rem 0;">
+             <label style="font-size:0.88rem;font-weight:600;display:block;margin-bottom:0.25rem;">Porsiyon Seçimi:</label>
+             <select id="porsiyon-${x.id}" onchange="fiyatGuncelle(${x.id}, ${f})" style="width:100%;padding:0.35rem;">
+               <option value="tam">Tam Porsiyon (${f.toFixed(2)} TL)</option>
+               <option value="yarim">Yarım Porsiyon - %60 (${yarimFiyat} TL)</option>
+             </select>
+           </div>`
+        : `<p style="font-size:0.85rem;color:#666;margin:0.5rem 0;">Porsiyon: <strong>Tam Porsiyon</strong> (Kahvaltıda yarım porsiyon yoktur)</p>`;
+
+      return `<article class="kart">
+        <h3>${x.tarih} - ${x.ogun_ad}</h3>
+        <p><strong>${x.yemekhane_ad}</strong> (${x.dolu_sayisi}/${x.kapasite})</p>
+        <p>Servis: ${x.servis_baslangic.slice(0,5)}-${x.servis_bitis.slice(0,5)} | Son: ${x.son_saat.slice(0,5)}</p>
+        <ul>${yemekHtml}</ul>
+        ${porsiyonSecimHtml}
+        <p><strong id="fiyat-${x.id}">${f.toFixed(2)} TL</strong></p>
+        <button class="dugme" onclick="rezYap(${x.id})">Rezervasyon Yap</button>
+      </article>`;
+    }).join(""):"<p>Menu bulunamadi.</p>";
+  }catch(e){
+    mesajGoster("mesaj",e.message,true);
+  }
+}
+
+async function rezYap(id){
+  const secimEl = document.getElementById(`porsiyon-${id}`);
+  const porsiyon = secimEl ? secimEl.value : "tam";
+  try{
+    const r=await apiIstek("/api/rezervasyonlar",{
+      method:"POST",
+      body:JSON.stringify({menu_id:id, porsiyon:porsiyon})
+    });
+    mesajGoster("mesaj",r.mesaj);
+    await bakiyeYenile();
+    menuleriYukle();
+  }catch(e){
+    mesajGoster("mesaj",e.message,true);
+  }
+}
+menuleriYukle();
 </script></body></html>
