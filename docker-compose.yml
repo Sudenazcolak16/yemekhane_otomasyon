@@ -53,6 +53,7 @@ services:
       - "3307:3306"
     volumes:
       - ./db/init:/docker-entrypoint-initdb.d:ro
+      - ./db/migrations/04_degisiklik.sql:/docker-entrypoint-initdb.d/04_degisiklik.sql:ro
       - mysql-primary-veri:/var/lib/mysql
 
   # ---------------------------------------------------------------
@@ -150,6 +151,7 @@ services:
         condition: service_healthy
       replica-setup:
         condition: service_completed_successfully
+
 volumes:
   mysql-primary-veri:
   mysql-replica-veri:
